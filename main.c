@@ -1,57 +1,74 @@
-#include <msp430.h> 
+#include <msp430.h>
 
+void gpioInit();
 
 int main(void)
 {
+    WDTCTL = WDTPW | WDTHOLD;   // stop watchdog timer
 
-    gpio_init();
-    timer_init();
-    i2c_init();
-    adc_init();
+    gpioInit();                 // Initialize all GPIO Pins for the project
 
-	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
-	
-while(1){
-	if(sensor0==1){
-	    //print detection to serial and iot
-	}
-	if(door_opens){
-	    total_occupants++;
-	    room0_occupants++;
-	}
-	if(sensor1==1){
-	    room0_occupants=room0_occupants-1;
-	    room1++;
-	}
-	if(sensor2==1){
-	    room1=room1=1;
-	    room2++;
-	}
-	if(exit_sensor==1){
-	    room2=room2-1;
-	    total_occupants=total_occupants-1;
-	}
-	//print all of that stuff to serial and iot updated on interrupt of sensor
-	return 0;
+
+    PM5CTL0 &= ~LOCKLPM5;                   // Disable the GPIO power-on default high-impedance mode
+                                            // to activate previously configured port settings
+    int room=0;                     //initially set occupancy to 0
+
+    while(1)
+    {
+        P1OUT |=  BIT7;
+        if(~P2IN & BIT3){           //these can detect the occupancy of my finger on the button
+            room++;}
+        if(~P4IN & BIT1){
+            room=room-1;}
+        if(P1IN & BIT2){            //This and the one below are the IR recievers. they just suck at recieving ir i guess?
+            room++;}
+        if(P1IN & BIT3){
+            room=room-1;}
+
+        __delay_cycles(500000);     //half a second i think?
+
+        if(room==0){                //setting up the leds
+           P1OUT &= ~BIT4;
+           P1OUT &= ~BIT5;
+           P1OUT &= ~BIT6;
+        }
+        if(room==1){                //WHEN ROOM =1, 1 led IS ACTIVE.
+            P1OUT |=  BIT4;
+            P1OUT &= ~BIT5;
+            P1OUT &= ~BIT6;
+        }
+        if(room==2){
+            P1OUT |=  BIT4;
+            P1OUT |=  BIT5;
+            P1OUT &= ~BIT6;
+        }
+        if(room==3){
+            P1OUT |=  BIT4;
+            P1OUT |=  BIT5;
+            P1OUT |=  BIT6;
+        }
     }
 }
 
-void gpio_init(){
-    //pins
-}
+void gpioInit()
+{
+   // Setting Directions of Pins
 
-void timer_init(){
-    //timer here
-    //i dont think this really matters that much, does not depend on clk
-}
+       P1DIR |= BIT0;              // Configure P1.0 to an Output
+       P6DIR |= BIT6;              // Configure P6.6 to an Output
+       P1DIR |= BIT4;
+       P1DIR |= BIT5;
+       P1DIR |= BIT6;
+       P1DIR |= BIT7;
+       P2DIR &= ~BIT3;             // Configure P2.3 to an Input
+       P4DIR &= ~BIT1;             // Configure P4.1 to an Input
+       P1DIR &= ~BIT2;
+       P1DIR &= ~BIT3;
 
-void i2c_init(){
-    //iot broker or whatever
-    //initialize variables that i want to use for thingy
-}
 
-void adc_init(){
-    //interpret analog sensor data ig?
-    //maybe need to send "door" signal as this?
-}
+       P2REN |= BIT3;               // Enable Resistor on P2.3
+       P2OUT |= BIT3;               // Configure Resistor on P2.3 to be Pullup
 
+       P4REN |= BIT1;               // Enable Resistor on P4.1
+       P4OUT |= BIT1;               // Configure Resistor on P4.1 to be Pullup
+}
